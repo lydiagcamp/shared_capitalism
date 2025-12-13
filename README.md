@@ -1,4 +1,4 @@
-# Shared Capitalism Project
+# The Shared Capitalism Project
 
 ## Description
 
