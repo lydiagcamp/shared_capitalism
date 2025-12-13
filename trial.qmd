@@ -8,8 +8,6 @@ format: html
 library(tidyverse)
 library(plotly)
 
-
-setwd("~/Desktop/MA UC3M/TFM/ESOP/Form 5500")
 summary_df <- read_csv("aggregate_data.csv")
 
 
