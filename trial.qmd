@@ -1,5 +1,5 @@
 ---
-title: "Hello, Quarto"
+title: "Shared Capitalism in the United States (1999-2024)"
 format: html
 ---
 
