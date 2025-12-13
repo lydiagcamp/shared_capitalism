@@ -4,12 +4,16 @@ format: html
 ---
 
 ```{r}
+#| echo: false    # hides the R code
+#| eval: true
+#| message: false
+#| warning: false
 
 library(tidyverse)
 library(plotly)
 
+# Read the data
 summary_df <- read_csv("aggregate_data.csv")
-
 
 # Select only ESOP and profit_sharing
 summary_long <- summary_df %>%
@@ -18,6 +22,7 @@ summary_long <- summary_df %>%
 # Create a scaling factor so profit_sharing fits on the same plot
 scale_factor <- max(summary_long$ESOP, na.rm = TRUE) / max(summary_long$profit_sharing, na.rm = TRUE)
 
+# Create the ggplot
 p <- ggplot(summary_long, aes(x = year)) +
   # ESOP on primary y-axis
   geom_line(aes(y = ESOP, color = "ESOP"), size = 1.2) +
@@ -42,4 +47,6 @@ p <- ggplot(summary_long, aes(x = year)) +
     axis.text.x = element_text(angle = 45, hjust = 1)
   )
 
+# Render as interactive plotly graph
 ggplotly(p)
+
