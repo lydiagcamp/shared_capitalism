@@ -2,6 +2,9 @@
 title: "Hello, Quarto"
 format: html
 ---
+
+```{r}
+
 library(tidyverse)
 library(plotly)
 
