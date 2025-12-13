@@ -2,7 +2,7 @@
 
 ## Description
 
-Shared capitalism is an umbrella term encompassing plans that give workers a financial stake in their employers' success. Typically, shared capitalism refers to (1) employee stock ownership plans (ESOPs), (2) profit-sharing plans, and (3) stock bonuses. Data on shared capitalism is generally limited, and there is no official database that tracks its changes over time. This dataset seeks to address this gap by offering clean and comprehensive coverage of companies that provide these three plans from 1999 to 2024.
+Shared capitalism is an umbrella term encompassing plans that give workers a financial stake in their employers' success. Typically, shared capitalism refers to (1) employee stock ownership plans (ESOPs), (2) profit-sharing plans, and (3) stock bonuses. Data on shared capitalism is generally limited, and there is no official database that tracks its changes over time. This dataset aims to make research in this field more accessible by providing clean, comprehensive data on companies offering these three plans from 1999 to 2024.
 
 ## Data Sources
 The data are drawn from the Form 5500 filings from the [U.S. Department of Labor (EBSA)](https://www.dol.gov/agencies/ebsa/researchers/data). All organizations that offer any kind of employee benefit plans covered by ERISA (Employee Retirement Income Security Act) must fill out this form annually. 
