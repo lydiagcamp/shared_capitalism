@@ -1,4 +1,4 @@
-# The Shared Capitalism Project
+# Shared Capitalism in the United States (1999-2024)
 
 ## Description
 
