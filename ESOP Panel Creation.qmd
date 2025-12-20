@@ -1,0 +1,452 @@
+---
+title: "ESOP Panel Creation"
+format: html
+editor: visual
+---
+
+# (1) Create Panel
+
+```{r}
+## Load packages
+library(tidyverse)
+library(readr)
+library(data.table)
+library(stringr)
+library(stringdist)
+library(igraph)
+library(tibble)
+library(purrr)
+library(openai)
+library(httr2)
+```
+
+## Clean raw data from Form 5500 Filings
+
+```{r}
+# Load data (named ff_1999 through ff_2024)
+setwd("~/Desktop/MA UC3M/TFM/ESOP/Form 5500/Form 5500 Raw Data")
+years <- 1999:2024
+ff <- setNames(
+  lapply(years, function(y) read_csv(paste0("ff_", y, ".csv"))),
+  paste0("ff_", years)
+)
+
+# Create cleaning function
+clean_ff <- function(df) {
+  df |>
+    transmute(
+      id = FILING_ID,
+      plan_name = PLAN_NAME,
+      start_year = PLAN_EFF_DATE,
+      sponsor_name = SPONSOR_DFE_NAME,
+      street = SPONS_DFE_MAIL_STR_ADDRESS,
+      city = SPONS_DFE_CITY,
+      state = SPONS_DFE_STATE,
+      zipcode = SPONS_DFE_ZIP_CODE,
+      phone_number = SPONS_DFE_PHONE_NUM,
+      collective_bargain = COLLECTIVE_BARGAIN_IND,
+      active_participants = TOT_ACTIVE_PARTCP_CNT,
+      type = TYPE_PENSION_BNFT_CODE
+    ) |>
+    mutate(
+      start_year = as.numeric(substr(as.character(start_year), 1, 4)),
+      esop = as.integer(grepl("2O|2P", type)),
+      profit_sharing = as.integer(grepl("2E", type)),
+      stock_bonus = as.integer(grepl("2I", type))
+    ) |>
+    filter(esop == 1 | stock_bonus == 1 | profit_sharing == 1) |>
+    select(-type)
+}
+
+# Clean the data 
+ff_clean <- lapply(ff, clean_ff)
+```
+
+```{r}
+# Build full panel from clean data
+panel <- bind_rows(
+  Map(
+    function(df, name) {
+      df |> mutate(year = as.numeric(sub("ff_", "", name)))
+    },
+    ff_clean,
+    names(ff_clean)
+  )
+) |> as.data.table()
+
+# Clean start year
+valid_years <- 1950:2025
+panel[, start_year_clean :=
+        fifelse(start_year %in% valid_years, start_year, NA_integer_)]
+
+# If missing start_year, I use the first observed year of the plan
+panel[, start_year_final :=
+        fifelse(!is.na(start_year_clean),
+                start_year_clean,
+                min(year, na.rm = TRUE)),
+      by = id]
+
+# Ensure id is a character
+panel[, id := as.character(id)]
+
+# Keep only ESOP plans
+esop_rows <- panel[esop == 1]
+
+# Remove duplicates
+esop_rows <- unique(esop_rows, by = c("plan_name", "year"))
+```
+
+# (2) Fuzzy Matching
+
+## Normalize plan names before matching
+
+```{r}
+## I start with fuzzy matching to minimize the size of the dataset before passing it to OpenAI.
+
+# Normalize plan names
+esop_rows[, plan_name := toupper(trimws(
+  gsub("\\s+", " ",                              # collapse extra spaces
+       gsub("[,#\\.()\\-]", "",                        # remove punctuation
+            gsub("&", "and",                           
+                 gsub("401\\(K\\)|401 K", "401K", plan_name, ignore.case = TRUE)
+            )
+       )
+  )
+))]
+
+# Remove single quotes
+esop_rows[, plan_name := gsub("'", "", plan_name)]
+
+# Standardize company and ESOP terms
+esop_rows[, plan_name := gsub("\\bcompany\\b", "co", plan_name, ignore.case = TRUE)]
+esop_rows[, plan_name := gsub("\\b(employee stock ownership plan|stock ownership plan|employee stock ownership|employer stock ownership plan|employee stock ownership trust|employee stock bonus plan|employees stock ownership trust|employee stock employee stock ownership plan|esop plan|employee stockownership plan|employees stock ownership plan|employee stock savings plan|esop trust|pension plan|esop and savings plan|STOCK OWNERGHIP PLAN|incemployee esop|incemployees esop|ESOP PN AND TR|ESOP ESOP|employee esop|employer esop|EMPLOYEE STOCK OWNWERSHIP PLAN|EMPLOYEE S TOCK OWNER SHIP PLAN|EMPLOYEE STOCK OWNERSHIPPLAN)\\b", 
+                                    "ESOP", plan_name, ignore.case = TRUE)]
+
+# Correct common typos
+esop_rows[, plan_name := gsub("\\bstodk\\b|\\bstolk\\b", "STOCK", plan_name, ignore.case = TRUE)]
+esop_rows[, plan_name := gsub("\\bo wnership\\b|\\bowership\\b|\\bownerhship\\b", "OWNERSHIP", plan_name, ignore.case = TRUE)]
+
+# Remove unnecessary words
+esop_rows[, plan_name := gsub("\\band trust\\b|\\binc\\b", "", plan_name, ignore.case = TRUE)]
+
+# Final cleanup
+esop_rows[, plan_name := toupper(trimws(plan_name))]
+```
+
+## Match plans by approximate name
+
+```{r}
+# Clean plan names
+clean_name <- function(x) {
+  x <- tolower(x)
+  x <- gsub("&", "and", x, fixed = TRUE)
+  x <- gsub("[[:punct:]]", "", x)
+  x <- gsub("\\b(inc|corp|corporation|co|co.|inc.|company|llc|ltd|employee stock ownership|esop|plan|employee stock ownership plan|trust|401k|401\\(k\\)|-#1|and trust)\\b", "", x)
+  x <- gsub("\\s+", " ", x)
+  trimws(x)
+}
+
+esop_rows[, plan_name_clean := clean_name(plan_name)]
+
+# Block by first word
+esop_rows[, first_word := tstrsplit(plan_name_clean, " ")[[1]]]
+esop_rows[, name_len := nchar(plan_name_clean)]
+
+# Unique plan names
+plans <- unique(esop_rows[, .(plan_name, plan_name_clean, first_word, name_len)])
+
+# Fuzzy matching within first_word blocks
+threshold_dist <- 0.1   # jw distance threshold
+threshold_len  <- 8     # max length difference
+
+edges <- plans[
+  plans,
+  on = .(first_word),
+  allow.cartesian = TRUE
+][
+  abs(name_len - i.name_len) <= threshold_len
+][
+  plan_name_clean < i.plan_name_clean
+][
+  , .(
+      from = plan_name,
+      to   = i.plan_name,
+      dist = stringdist(plan_name_clean, i.plan_name_clean, method = "jw")
+    )
+][
+  dist <= threshold_dist,
+  .(from, to)
+]
+
+# Create graph and components
+g <- graph_from_data_frame(edges, vertices = plans$plan_name, directed = FALSE)
+components <- components(g)
+
+group_map <- data.table(
+  plan_name = names(components$membership),
+  group_id  = components$membership
+)
+
+# Assign canonical plan_name
+canonical <- esop_rows[, .N, by = plan_name][
+  group_map, on = "plan_name"
+][
+  , .SD[which.max(N)], by = group_id
+][
+  , .(group_id, canonical_plan_name = plan_name)
+]
+
+# Merge canonical names back
+esop_rows <- merge(esop_rows, group_map, by = "plan_name", all.x = TRUE)
+esop_rows <- merge(esop_rows, canonical, by = "group_id", all.x = TRUE)
+
+# Build panel using fuzzy plan name
+df_panel <- esop_rows[
+  , .(
+      esop_start = min(year, na.rm = TRUE),
+      esop_end   = max(year, na.rm = TRUE),
+      sponsor_name = sponsor_name[1],
+      street        = street[1],
+      city          = city[1],
+      state         = state[1],
+      zipcode       = zipcode[1],
+      phone_number  = phone_number[1],
+      collective_bargain = collective_bargain[1],
+      start_year = start_year[1]
+  ),
+  by = canonical_plan_name
+]
+```
+
+# (3) Open AI
+
+```{r}
+# Set Open AI key 
+Sys.setenv(OPENAI_API_KEY = "sk-") # Real key is hidden for privacy reasons
+
+# Clean data (once again)
+df_panel$plan_name_clean <- df_panel$canonical_plan_name |> 
+  str_squish() |>     # remove extra spaces
+  str_to_upper()      # convert to all caps
+```
+
+## Create a function to train the AI
+
+```{r}
+# Create function
+canonicalize_plan_v2 <- function(plan_name) {
+  cleaned_name <- gsub("\\b(AMENDED|RESTATED)\\b", "", plan_name, ignore.case = TRUE)
+  cleaned_name <- gsub("\\s+", " ", cleaned_name)
+  cleaned_name <- trimws(cleaned_name)         
+  
+  # Introduce prompt
+  prompt <- paste0(
+    "Rewrite the following employee plan name in canonical format:\n",
+    cleaned_name, "\n",
+    "Correct all spelling and spacing errors.\n",
+    "Convert any plan that is some form of Employee Stock Ownership Plan (e.g., ESOP, Employee Stock Ownership Plan, Employee Stock Ownership Plans Trust, etc.) to 'ESOP'.\n",
+    "DO NOT remove the first word of the original plan name. Do not leave 'ESOP' alone unless it was originally a single-word plan.\n",
+    "Preserve all other plan types and modifiers exactly as they appear (e.g., 401K, STOCK BONUS PLAN, MONEY PURCHASE PENSION PLAN, FOR SALARIED EMPLOYEES).\n",
+    "Use only uppercase letters, numbers, and spaces. Do not add any punctuation, dashes, parentheses, or other symbols.\n",
+    "Output only the canonical name, nothing else."
+  )
+  resp <- request("https://api.openai.com/v1/chat/completions") |>
+    req_headers(
+      Authorization = paste("Bearer", Sys.getenv("OPENAI_API_KEY")),
+      `Content-Type` = "application/json"
+    ) |>
+    req_body_json(list(
+      model = "gpt-4o-mini",
+      messages = list(
+        list(role = "system", content = "You are a data-cleaning assistant."),
+        list(role = "user", content = prompt)
+      ),
+      temperature = 0
+    )) |>
+    req_perform() |>
+    resp_body_json(simplifyVector = TRUE)
+
+  # Safe extraction
+  if (!is.null(resp$choices) && nrow(resp$choices) > 0) {
+    return(resp$choices$message$content[[1]])
+  } else {
+    warning("No content returned for plan: ", plan_name)
+    return(NA_character_)
+  }
+}
+
+# Include safeguard for errors
+canonical_safe_v2 <- function(plan_name) {
+  tryCatch(
+    canonicalize_plan_v2(plan_name),
+    error = function(e) {
+      warning("Failed for plan: ", plan_name)
+      return(NA_character_)
+    }
+  )
+}
+```
+
+## Pass data through the function to Open AI
+
+```{r}
+# Parameters for batch processing
+batch_size <- 500
+n <- nrow(df_panel)
+num_batches <- ceiling(n / batch_size)
+start_batch <- 1  
+
+# Loop through batches
+for(i in start_batch:num_batches) {
+  
+  start <- (i - 1) * batch_size + 1
+  end <- min(i * batch_size, n)
+  
+  batch <- df_panel$plan_name_clean[start:end]
+  
+  # Apply function
+  df_panel$plan_name_canonical[start:end] <- map_chr(batch, canonical_safe_v2)
+  
+  cat("Processed batch", i, "of", num_batches, "\n")
+  
+  # Pause and checkpoint
+  Sys.sleep(1)
+  if(i %% 5 == 0) {
+    saveRDS(df_panel, "df_panel_partial.rds")
+  }
+}
+
+# Final save
+write.csv(df_panel, "df_panel.csv", row.names = FALSE)
+```
+
+## Fix remaining errors and match again based on cleaned names
+
+```{r}
+# Fix issues with AI-cleaned data
+df_panel$plan_name_canonical <- ifelse(
+  df_panel$plan_name_canonical == "ESOP" & !is.na(df_panel$plan_name_canonical),
+  df_panel$plan_name_clean,
+  df_panel$plan_name_canonical
+)
+
+# Retitle the variables
+df <- df_panel |> 
+  transmute(plan_name = plan_name_canonical,
+            first_rec_year = esop_start,
+            last_rec_year = esop_end,
+            plan_start_year = start_year,
+            sponsor_name = sponsor_name,
+            street = street,
+            city = city,
+            state = state,
+            zipcode = zipcode,
+            phone_number = phone_number,
+            collective_bargain = collective_bargain)
+```
+
+```{r}
+setDT(df)
+
+# Match based on clean names
+clean_name <- function(x) {
+  x <- tolower(x)
+  x <- gsub("&", "and", x, fixed = TRUE)
+  x <- gsub("[[:punct:]]", "", x)
+  x <- gsub("\\b(inc|corp|corporation|co|co.|inc.|company|llc|ltd|employee stock ownership|esop|plan|employee stock ownership plan|trust|401k|401\\(k\\)|-#1|and trust)\\b", "", x)
+  x <- gsub("\\s+", " ", x)
+  trimws(x)
+}
+
+df[, plan_name_clean := clean_name(plan_name)]
+
+# Block by first word
+df[, first_word := tstrsplit(plan_name_clean, " ")[[1]]]
+df[, name_len := nchar(plan_name_clean)]
+
+# Unique plan names
+plans <- unique(df[, .(plan_name, plan_name_clean, first_word, name_len)])
+threshold_dist <- 0.15 
+threshold_len  <- 8     
+
+edges <- plans[
+  plans,
+  on = .(first_word),
+  allow.cartesian = TRUE
+][
+  abs(name_len - i.name_len) <= threshold_len
+][
+  plan_name_clean < i.plan_name_clean
+][
+  , .(
+      from = plan_name,
+      to   = i.plan_name,
+      dist = stringdist(plan_name_clean, i.plan_name_clean, method = "jw")
+    )
+][
+  dist <= threshold_dist,
+  .(from, to)
+]
+
+# Create graph and components
+g <- graph_from_data_frame(edges, vertices = plans$plan_name, directed = FALSE)
+components <- components(g)
+
+group_map <- data.table(
+  plan_name = names(components$membership),
+  group_id  = components$membership
+)
+
+# Assign canonical plan_name
+canonical <- df[, .N, by = plan_name][
+  group_map, on = "plan_name"
+][
+  , .SD[which.max(N)], by = group_id
+][
+  , .(group_id, canonical_plan_name = plan_name)
+]
+
+# Merge canonical names back
+df <- merge(df, group_map, by = "plan_name", all.x = TRUE)
+df <- merge(df, canonical, by = "group_id", all.x = TRUE)
+
+# Build panel using fuzzy plan name
+df2 <- df[
+  , .(
+      first_rec_year = min(first_rec_year, na.rm = TRUE),
+      last_rec_year   = max(last_rec_year, na.rm = TRUE),
+      sponsor_name = sponsor_name[1],
+      street        = street[1],
+      city          = city[1],
+      state         = state[1],
+      zipcode       = zipcode[1],
+      phone_number  = phone_number[1],
+      collective_bargain = collective_bargain[1],
+      plan_start_year = plan_start_year[1]
+  ),
+  by = canonical_plan_name
+]
+```
+
+```{r}
+## I then manually combed through thousands of observations to correct remaining errors.
+```
+
+# (4) Descriptive Data
+
+```{r}
+# Count the number of plans per year
+setDT(df_panel)
+plans_by_year <- df_panel[
+  , .(year = seq(first_rec_year, last_rec_year)), 
+  by = canonical_plan_name
+]
+
+# Count unique active plans per year
+active_plans <- plans_by_year[
+  , .(active_plans = uniqueN(canonical_plan_name)), 
+  by = year
+][order(year)]
+
+active_plans
+```
