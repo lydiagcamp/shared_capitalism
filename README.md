@@ -4,7 +4,7 @@
 
 This dataset represents the first comprehensive panel of Employee Stock Ownership Plans (ESOPs) in the United States that tracks the same plans over time (1999 to 2024). The panel was constructed using raw Form 5500 filings from the [U.S. Department of Labor (EBSA)](https://www.dol.gov/agencies/ebsa/researchers/data). All organizations that offer any kind of employee benefit plans covered by ERISA (Employee Retirement Income Security Act) must fill out this form annually. Since there is no universal unique identifier, plan names were matched across years using a combination of manual coding, fuzzy string matching, and AI-assisted standardization via OpenAI’s GPT-4o-mini model. 
 
-You can find reproducible code for the creation of the database [here](https://lydiagcamp.github.io/shared_capitalism/ESOP_Panel_Creation.html). 
+You can find reproducible code for the creation of the database [here](https://lydiagcamp.github.io/shared_capitalism/ESOP_Panel_Creation.html) and a visual summary of the data [here](https://lydia-camp.shinyapps.io/plans-map-us/).
 
 ## Variables
 
