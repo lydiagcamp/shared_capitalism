@@ -69,15 +69,38 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="ESOP_Panel_Creation_files/libs/quarto-html/quarto-syntax-highlighting-587c61ba64f3a5504c4d52d930310e48.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="ESOP_Panel_Creation_files/libs/bootstrap/bootstrap.min.js"></script>
 <link href="ESOP_Panel_Creation_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="ESOP_Panel_Creation_files/libs/bootstrap/bootstrap-d6a003b94517c951b2d65075d42fb01b.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="ESOP_Panel_Creation_files/libs/bootstrap/bootstrap-a74871fe4945b66d259aafc266475145.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 
 
 </head>
 
-<body class="fullcontent quarto-light">
+<body class="quarto-light">
 
 <div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
-
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul class="collapse">
+  <li><a href="#create-panel" id="toc-create-panel" class="nav-link active" data-scroll-target="#create-panel"><span class="header-section-number">1</span> (1) Create Panel</a>
+  <ul class="collapse">
+  <li><a href="#clean-raw-data-from-form-5500-filings" id="toc-clean-raw-data-from-form-5500-filings" class="nav-link" data-scroll-target="#clean-raw-data-from-form-5500-filings"><span class="header-section-number">1.1</span> Clean raw data from Form 5500 Filings</a></li>
+  </ul></li>
+  <li><a href="#fuzzy-matching" id="toc-fuzzy-matching" class="nav-link" data-scroll-target="#fuzzy-matching"><span class="header-section-number">2</span> (2) Fuzzy Matching</a>
+  <ul class="collapse">
+  <li><a href="#normalize-plan-names-before-matching" id="toc-normalize-plan-names-before-matching" class="nav-link" data-scroll-target="#normalize-plan-names-before-matching"><span class="header-section-number">2.1</span> Normalize plan names before matching</a></li>
+  <li><a href="#match-plans-by-approximate-name" id="toc-match-plans-by-approximate-name" class="nav-link" data-scroll-target="#match-plans-by-approximate-name"><span class="header-section-number">2.2</span> Match plans by approximate name</a></li>
+  </ul></li>
+  <li><a href="#open-ai" id="toc-open-ai" class="nav-link" data-scroll-target="#open-ai"><span class="header-section-number">3</span> (3) Open AI</a>
+  <ul class="collapse">
+  <li><a href="#create-a-function-to-train-the-ai" id="toc-create-a-function-to-train-the-ai" class="nav-link" data-scroll-target="#create-a-function-to-train-the-ai"><span class="header-section-number">3.1</span> Create a function to train the AI</a></li>
+  <li><a href="#pass-data-through-the-function-to-open-ai" id="toc-pass-data-through-the-function-to-open-ai" class="nav-link" data-scroll-target="#pass-data-through-the-function-to-open-ai"><span class="header-section-number">3.2</span> Pass data through the function to Open AI</a></li>
+  <li><a href="#fix-remaining-errors-and-match-again-based-on-cleaned-names" id="toc-fix-remaining-errors-and-match-again-based-on-cleaned-names" class="nav-link" data-scroll-target="#fix-remaining-errors-and-match-again-based-on-cleaned-names"><span class="header-section-number">3.3</span> Fix remaining errors and match again based on cleaned names</a></li>
+  </ul></li>
+  <li><a href="#descriptive-data" id="toc-descriptive-data" class="nav-link" data-scroll-target="#descriptive-data"><span class="header-section-number">4</span> (4) Descriptive Data</a></li>
+  </ul>
+</nav>
+</div>
 <main class="content" id="quarto-document-content">
 
 <header id="title-block-header" class="quarto-title-block default">
@@ -99,9 +122,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<section id="create-panel" class="level1">
-<h1>(1) Create Panel</h1>
+<section id="create-panel" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> (1) Create Panel</h1>
 <div class="cell">
+<details class="code-fold">
+<summary>Show/hide code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="do">## Load packages</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(readr)</span>
@@ -113,10 +138,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(purrr)</span>
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(openai)</span>
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(httr2)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
 </div>
-<section id="clean-raw-data-from-form-5500-filings" class="level2">
-<h2 class="anchored" data-anchor-id="clean-raw-data-from-form-5500-filings">Clean raw data from Form 5500 Filings</h2>
+<section id="clean-raw-data-from-form-5500-filings" class="level2" data-number="1.1">
+<h2 data-number="1.1" class="anchored" data-anchor-id="clean-raw-data-from-form-5500-filings"><span class="header-section-number">1.1</span> Clean raw data from Form 5500 Filings</h2>
 <div class="cell">
+<details class="code-fold">
+<summary>Show/hide code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Load data (named ff_1999 through ff_2024)</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">setwd</span>(<span class="st">"~/Desktop/MA UC3M/TFM/ESOP/Form 5500/Form 5500 Raw Data"</span>)</span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>years <span class="ot">&lt;-</span> <span class="dv">1999</span><span class="sc">:</span><span class="dv">2024</span></span>
@@ -154,8 +182,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a><span class="co"># Clean the data </span></span>
 <span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>ff_clean <span class="ot">&lt;-</span> <span class="fu">lapply</span>(ff, clean_ff)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
 </div>
 <div class="cell">
+<details class="code-fold">
+<summary>Show/hide code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Build full panel from clean data</span></span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>panel <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">Map</span>(</span>
@@ -187,14 +218,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a><span class="co"># Remove duplicates</span></span>
 <span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a>esop_rows <span class="ot">&lt;-</span> <span class="fu">unique</span>(esop_rows, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"plan_name"</span>, <span class="st">"year"</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
 </div>
 </section>
 </section>
-<section id="fuzzy-matching" class="level1">
-<h1>(2) Fuzzy Matching</h1>
-<section id="normalize-plan-names-before-matching" class="level2">
-<h2 class="anchored" data-anchor-id="normalize-plan-names-before-matching">Normalize plan names before matching</h2>
+<section id="fuzzy-matching" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> (2) Fuzzy Matching</h1>
+<section id="normalize-plan-names-before-matching" class="level2" data-number="2.1">
+<h2 data-number="2.1" class="anchored" data-anchor-id="normalize-plan-names-before-matching"><span class="header-section-number">2.1</span> Normalize plan names before matching</h2>
 <div class="cell">
+<details class="code-fold">
+<summary>Show/hide code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="do">## I start with fuzzy matching to minimize the size of the dataset before passing it to OpenAI.</span></span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Normalize plan names</span></span>
@@ -225,11 +259,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a><span class="co"># Final cleanup</span></span>
 <span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>esop_rows[, plan_name <span class="sc">:</span><span class="er">=</span> <span class="fu">toupper</span>(<span class="fu">trimws</span>(plan_name))]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
 </div>
 </section>
-<section id="match-plans-by-approximate-name" class="level2">
-<h2 class="anchored" data-anchor-id="match-plans-by-approximate-name">Match plans by approximate name</h2>
+<section id="match-plans-by-approximate-name" class="level2" data-number="2.2">
+<h2 data-number="2.2" class="anchored" data-anchor-id="match-plans-by-approximate-name"><span class="header-section-number">2.2</span> Match plans by approximate name</h2>
 <div class="cell">
+<details class="code-fold">
+<summary>Show/hide code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Clean plan names</span></span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>clean_name <span class="ot">&lt;-</span> <span class="cf">function</span>(x) {</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  x <span class="ot">&lt;-</span> <span class="fu">tolower</span>(x)</span>
@@ -310,12 +347,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb5-78"><a href="#cb5-78" aria-hidden="true" tabindex="-1"></a>  ),</span>
 <span id="cb5-79"><a href="#cb5-79" aria-hidden="true" tabindex="-1"></a>  by <span class="ot">=</span> canonical_plan_name</span>
 <span id="cb5-80"><a href="#cb5-80" aria-hidden="true" tabindex="-1"></a>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
 </div>
 </section>
 </section>
-<section id="open-ai" class="level1">
-<h1>(3) Open AI</h1>
+<section id="open-ai" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> (3) Open AI</h1>
 <div class="cell">
+<details class="code-fold">
+<summary>Show/hide code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Set Open AI key </span></span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="fu">Sys.setenv</span>(<span class="at">OPENAI_API_KEY =</span> <span class="st">"sk-"</span>) <span class="co"># Real key is hidden for privacy reasons</span></span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -323,10 +363,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>df_panel<span class="sc">$</span>plan_name_clean <span class="ot">&lt;-</span> df_panel<span class="sc">$</span>canonical_plan_name <span class="sc">|&gt;</span> </span>
 <span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">str_squish</span>() <span class="sc">|&gt;</span>     <span class="co"># remove extra spaces</span></span>
 <span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">str_to_upper</span>()      <span class="co"># convert to all caps</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
 </div>
-<section id="create-a-function-to-train-the-ai" class="level2">
-<h2 class="anchored" data-anchor-id="create-a-function-to-train-the-ai">Create a function to train the AI</h2>
+<section id="create-a-function-to-train-the-ai" class="level2" data-number="3.1">
+<h2 data-number="3.1" class="anchored" data-anchor-id="create-a-function-to-train-the-ai"><span class="header-section-number">3.1</span> Create a function to train the AI</h2>
 <div class="cell">
+<details class="code-fold">
+<summary>Show/hide code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Create function</span></span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>canonicalize_plan_v2 <span class="ot">&lt;-</span> <span class="cf">function</span>(plan_name) {</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  cleaned_name <span class="ot">&lt;-</span> <span class="fu">gsub</span>(<span class="st">"</span><span class="sc">\\</span><span class="st">b(AMENDED|RESTATED)</span><span class="sc">\\</span><span class="st">b"</span>, <span class="st">""</span>, plan_name, <span class="at">ignore.case =</span> <span class="cn">TRUE</span>)</span>
@@ -379,11 +422,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb7-50"><a href="#cb7-50" aria-hidden="true" tabindex="-1"></a>    }</span>
 <span id="cb7-51"><a href="#cb7-51" aria-hidden="true" tabindex="-1"></a>  )</span>
 <span id="cb7-52"><a href="#cb7-52" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
 </div>
 </section>
-<section id="pass-data-through-the-function-to-open-ai" class="level2">
-<h2 class="anchored" data-anchor-id="pass-data-through-the-function-to-open-ai">Pass data through the function to Open AI</h2>
+<section id="pass-data-through-the-function-to-open-ai" class="level2" data-number="3.2">
+<h2 data-number="3.2" class="anchored" data-anchor-id="pass-data-through-the-function-to-open-ai"><span class="header-section-number">3.2</span> Pass data through the function to Open AI</h2>
 <div class="cell">
+<details class="code-fold">
+<summary>Show/hide code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Parameters for batch processing</span></span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>batch_size <span class="ot">&lt;-</span> <span class="dv">500</span></span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="fu">nrow</span>(df_panel)</span>
@@ -412,11 +458,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a><span class="co"># Final save</span></span>
 <span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a><span class="fu">write.csv</span>(df_panel, <span class="st">"df_panel.csv"</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
 </div>
 </section>
-<section id="fix-remaining-errors-and-match-again-based-on-cleaned-names" class="level2">
-<h2 class="anchored" data-anchor-id="fix-remaining-errors-and-match-again-based-on-cleaned-names">Fix remaining errors and match again based on cleaned names</h2>
+<section id="fix-remaining-errors-and-match-again-based-on-cleaned-names" class="level2" data-number="3.3">
+<h2 data-number="3.3" class="anchored" data-anchor-id="fix-remaining-errors-and-match-again-based-on-cleaned-names"><span class="header-section-number">3.3</span> Fix remaining errors and match again based on cleaned names</h2>
 <div class="cell">
+<details class="code-fold">
+<summary>Show/hide code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Fix issues with AI-cleaned data</span></span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>df_panel<span class="sc">$</span>plan_name_canonical <span class="ot">&lt;-</span> <span class="fu">ifelse</span>(</span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  df_panel<span class="sc">$</span>plan_name_canonical <span class="sc">==</span> <span class="st">"ESOP"</span> <span class="sc">&amp;</span> <span class="sc">!</span><span class="fu">is.na</span>(df_panel<span class="sc">$</span>plan_name_canonical),</span>
@@ -437,8 +486,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>            <span class="at">zipcode =</span> zipcode,</span>
 <span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>            <span class="at">phone_number =</span> phone_number,</span>
 <span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>            <span class="at">collective_bargain =</span> collective_bargain)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
 </div>
 <div class="cell">
+<details class="code-fold">
+<summary>Show/hide code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">setDT</span>(df)</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Match based on clean names</span></span>
@@ -519,15 +571,21 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb10-78"><a href="#cb10-78" aria-hidden="true" tabindex="-1"></a>  ),</span>
 <span id="cb10-79"><a href="#cb10-79" aria-hidden="true" tabindex="-1"></a>  by <span class="ot">=</span> canonical_plan_name</span>
 <span id="cb10-80"><a href="#cb10-80" aria-hidden="true" tabindex="-1"></a>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
 </div>
 <div class="cell">
+<details class="code-fold">
+<summary>Show/hide code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="do">## I then manually combed through thousands of observations to correct remaining errors.</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
 </div>
 </section>
 </section>
-<section id="descriptive-data" class="level1">
-<h1>(4) Descriptive Data</h1>
+<section id="descriptive-data" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> (4) Descriptive Data</h1>
 <div class="cell">
+<details class="code-fold">
+<summary>Show/hide code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Count the number of plans per year</span></span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="fu">setDT</span>(df_panel)</span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>plans_by_year <span class="ot">&lt;-</span> df_panel[</span>
@@ -542,6 +600,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>][<span class="fu">order</span>(year)]</span>
 <span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>active_plans</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
 </div>
 </section>
 
